@@ -1,7 +1,0 @@
-fastapi
-uvicorn
-streamlit
-openai
-httpx
-pydantic
-sseclient-py
