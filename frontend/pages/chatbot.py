@@ -10,7 +10,7 @@ import json
 st.set_page_config(page_title="💬 MCP Host", layout="wide")
 
 # --- Backend Base URL ---
-BACKEND_URL = "http://localhost:8000/api"
+BACKEND_URL = "http://localhost:8000/api/chat"
 
 # --- Session State Initialization ---
 if "selected_session_id" not in st.session_state:
@@ -21,7 +21,7 @@ if "chat_history" not in st.session_state:
 # --- Helper functions ---
 def fetch_sessions():
     try:
-        res = requests.get(f"{BACKEND_URL}/chat_sessions")
+        res = requests.get(f"{BACKEND_URL}/all")
         if res.status_code == 200:
             return res.json()
     except Exception:
@@ -30,7 +30,7 @@ def fetch_sessions():
 
 def fetch_chat_history(session_id):
     try:
-        res = requests.get(f"{BACKEND_URL}/chat_history/{session_id}")
+        res = requests.get(f"{BACKEND_URL}/{session_id}")
         if res.status_code == 200:
             chats = res.json()
             print(">> chats:", chats)
@@ -90,7 +90,7 @@ if prompt:
 
     with st.spinner("Sending your prompt..."):
         try:
-            response = requests.post(f"{BACKEND_URL}/prompt/stream", json=payload, stream=True)
+            response = requests.post(f"{BACKEND_URL}/stream", json=payload, stream=True)
             client = sseclient.SSEClient(response)
 
             steps_collected = []

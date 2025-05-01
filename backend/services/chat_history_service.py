@@ -12,13 +12,11 @@ class ChatHistoryService:
         db = SessionLocal()
         rows = chat_history_repo.get_chat_history_by_session(db, session_id)
         db.close()
-        return [
-            {
+        return [{
                 "user_prompt": row.original_prompt,
                 "steps": json.loads(row.steps) if row.steps and not isinstance(row.steps, list) else row.steps or [],
                 "final_answer": row.final_response
-            }
-            for row in rows
+            } for row in rows
         ]
 
     @staticmethod
@@ -31,12 +29,5 @@ class ChatHistoryService:
             .all()
         )
         db.close()
-
-        return [
-            {
-                "session_id": row.session_id,
-                "session_title": row.session_title or "(Untitled Session)"
-            }
-            for row in rows
-        ]
+        return [{"session_id": row.session_id, "session_title": row.session_title or "(Untitled Session)"} for row in rows]
 
