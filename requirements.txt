@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+sqlalchemy
+pydantic
+python-multipart
+pyyaml
+aiohttp
+httpx
+passlib[bcrypt]
+streamlit
+openai
+sseclient
+starlette
+requests
