@@ -3,7 +3,10 @@ from backend.database import models
 import uuid
 
 
-# ---- MCP Servers ----
+
+def get_mcp_server_by_name(db: Session, name: str):
+    return db.query(models.MCPServer).filter(models.MCPServer.name == name).first()
+
 def create_mcp_server(db: Session, data: dict):
     obj = models.MCPServer(id=str(uuid.uuid4()), **data)
     db.add(obj); db.commit(); db.refresh(obj); return obj
@@ -24,3 +27,4 @@ def delete_mcp_server(db: Session, mcp_id: str):
     obj = get_mcp_server(db, mcp_id)
     if obj: db.delete(obj); db.commit(); return True
     return False
+

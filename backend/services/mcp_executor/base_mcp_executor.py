@@ -1,7 +1,9 @@
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Dict
+
 
 class MCPExecutor(ABC):
+
     @abstractmethod
-    def execute(self, endpoint: str, payload: dict) -> Any:
+    async def execute(self, endpoint: str, payload: Dict[str, Any]) -> Dict[str, Any]:
         pass

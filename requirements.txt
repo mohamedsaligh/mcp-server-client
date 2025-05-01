@@ -12,3 +12,4 @@ openai
 sseclient
 starlette
 requests
+sseclient-py==1.7.2

@@ -39,8 +39,7 @@ class MCPServer(Base):
 
     id = Column(Text, primary_key=True)
     name = Column(Text)
-    category_id = Column(Text, ForeignKey("prompt_context.id"))
-    manifest = Column(Text, nullable=False)
+    keywords = Column(Text)  # NEW
     endpoint_url = Column(Text, nullable=False)
     is_active = Column(Boolean, default=True)
 

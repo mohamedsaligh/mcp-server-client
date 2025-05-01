@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from backend.routers.api import router
-from backend.database.init_db import init_db_models, init_db_from_schema
+from backend.database.init_db import init_db_from_schema
 
 
 def create_app():

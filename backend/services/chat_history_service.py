@@ -10,13 +10,16 @@ class ChatHistoryService:
     @staticmethod
     def load_chat_history(session_id: str):
         db = SessionLocal()
-        row = chat_history_repo.get_chat_history_by_session(db, session_id)
+        rows = chat_history_repo.get_chat_history_by_session(db, session_id)
         db.close()
-        return {
-            "user_prompt": row.original_prompt,
-            "steps": json.loads(row.steps) if row.steps else [],
-            "final_answer": row.final_response
-        }
+        return [
+            {
+                "user_prompt": row.original_prompt,
+                "steps": json.loads(row.steps) if row.steps and not isinstance(row.steps, list) else row.steps or [],
+                "final_answer": row.final_response
+            }
+            for row in rows
+        ]
 
     @staticmethod
     def list_chat_sessions() -> List[Dict[str, str]]:

@@ -1,9 +1,7 @@
-# file: pages/config.py
-
 import streamlit as st
 import requests
 
-# --- Helper to handle rerun-success messages ---
+
 def rerun_with_success(flag_name: str, message: str):
     if st.session_state.get(flag_name):
         st.success(message)
@@ -13,69 +11,85 @@ def set_success_and_rerun(flag_name: str):
     st.session_state[flag_name] = True
     st.rerun()
 
-# --- Streamlit Page Config ---
-st.set_page_config(page_title="🛠️ MCP Configurations", layout="wide")
+st.set_page_config(page_title="🖥️ MCP Server Management", layout="wide")
 
-# --- Backend Base URL ---
-BACKEND_URL = "http://localhost:8000"
+BACKEND_URL = "http://localhost:8000/api"
 
-# --- Sidebar Menu ---
 with st.sidebar:
     st.title("📋 Menu")
     st.page_link("main.py", label=" 💬 ChatBot")
     st.page_link("pages/app_config.py", label=" 🛠️ LLM Config")
     st.page_link("pages/mcp_config.py", label=" 🖥️ MCP Servers")
-    st.page_link("pages/prompt_config.py", label=" 🗂 Prompt Config")
+    st.page_link("pages/prompt_config.py", label=" 🗂 Prompt Contexts")
     st.divider()
 
-# --- Main Title ---
 st.subheader("🖥️ MCP Server Management")
 st.divider()
-# --- Show success messages after rerun if needed ---
-rerun_with_success("server_added_success", "✅ MCP server added successfully!")
-rerun_with_success("server_deleted_success", "✅ MCP server deleted successfully!")
 
-# --- Section: MCP Server Management ---
-st.markdown("##### ➕ Add MCP Server")
+rerun_with_success("mcp_added", "✅ MCP Server added successfully!")
+rerun_with_success("mcp_saved", "✅ MCP Server updated successfully!")
+rerun_with_success("mcp_deleted", "✅ MCP Server deleted successfully!")
 
-with st.form("add_mcp_server_form"):
-    mcp_name = st.text_input("Server Name", placeholder="Example: Area Calculator")
-    mcp_url = st.text_input("Server URL", placeholder="Example: http://localhost:8001")
-    submitted = st.form_submit_button("Add MCP Server")
+# --- Fetch existing MCP Servers ---
+existing_mcp_servers = []
+try:
+    response = requests.get(f"{BACKEND_URL}/config/mcp_servers")
+    if response.status_code == 200:
+        existing_mcp_servers = response.json()
+except Exception as e:
+    st.error(f"Failed to fetch MCP servers: {str(e)}")
 
-    if submitted and mcp_name and mcp_url:
-        res = requests.post(
-            f"{BACKEND_URL}/config/mcp_server",
-            json={"name": mcp_name, "base_url": mcp_url}
-        )
+# --- Add / Update ---
+st.markdown("##### ➕ Add / Update MCP Server")
+
+mcp_name = st.text_input("MCP Server Name")
+mcp_keywords = st.text_input("Keywords (comma-separated)")
+mcp_endpoint_url = st.text_input("Endpoint URL", placeholder="http://localhost:9001/process")
+
+
+if st.button("Save MCP Server"):
+    if mcp_name and mcp_endpoint_url:
+        payload = {
+            "name": mcp_name,
+            "keywords": mcp_keywords,
+            "endpoint_url": mcp_endpoint_url
+        }
+        res = requests.post(f"{BACKEND_URL}/config/mcp_servers", json=payload)
         if res.status_code == 200:
-            set_success_and_rerun("server_added_success")
+            set_success_and_rerun("mcp_added")
         else:
-            st.error("Failed to add MCP server.")
+            st.error("Failed to save MCP Server.")
 
 st.divider()
 
-st.markdown("##### 🗑️ Existing MCP Servers")
+# --- Existing MCP Servers ---
+st.markdown("##### 🔎 Existing MCP Servers")
 
-try:
-    mcp_servers = requests.get(f"{BACKEND_URL}/config/mcp_servers").json()
+if not existing_mcp_servers:
+    st.info("No MCP Servers found. Please add a new one using the form above.")
+else:
+    for mcp in existing_mcp_servers:
+        with st.expander(f"🖥️ {mcp['name']}"):
+            current_name = st.text_input("Server Name", value=mcp['name'], key=f"name_{mcp['id']}")
+            current_keywords = st.text_input("Keywords", value=mcp.get('keywords') or '', key=f"kw_{mcp['id']}")
+            current_url = st.text_input("Endpoint URL", value=mcp['endpoint_url'], key=f"url_{mcp['id']}")
 
-    if not mcp_servers:
-        st.info("No MCP servers configured yet.")
-    else:
-        for server in mcp_servers:
-            with st.container(border=True):
-                col1, col2 = st.columns([24, 1])
+            col1, col2 = st.columns(2)
 
-                with col1:
-                    st.markdown(f"**{server['name']}**  \n`{server['base_url']}`")
+            with col1:
+                if st.button(f"💾 Save Changes {mcp['name']}", key=f"save_{mcp['id']}"):
+                    payload = {
+                        "id": mcp['id'],
+                        "name": current_name,
+                        "keywords": current_keywords,
+                        "endpoint_url": current_url
+                    }
+                    res = requests.post(f"{BACKEND_URL}/config/mcp_servers", json=payload)
+                    if res.status_code == 200:
+                        set_success_and_rerun("mcp_saved")
 
-                with col2:
-                    if st.button("❌", key=f"delete_{server['mcp_id']}"):
-                        res = requests.delete(f"{BACKEND_URL}/config/mcp_server/{server['mcp_id']}")
-                        if res.status_code == 200:
-                            set_success_and_rerun("server_deleted_success")
-                        else:
-                            st.error(f"Failed to delete {server['name']}")
-except Exception as e:
-    st.error(f"Failed to fetch servers: {str(e)}")
+            with col2:
+                if st.button(f"❌ Delete {mcp['name']}", key=f"delete_{mcp['id']}"):
+                    res = requests.delete(f"{BACKEND_URL}/config/mcp_servers/{mcp['id']}")
+                    if res.status_code == 200:
+                        set_success_and_rerun("mcp_deleted")

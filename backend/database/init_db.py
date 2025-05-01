@@ -36,8 +36,3 @@ def init_db_from_schema():
     conn.close()
     print("✅ Database initialized from schema.sql")
 
-# --- ORM-based Table Creation ---
-def init_db_models():
-    Base.metadata.create_all(bind=engine)
-    print("✅ Database tables created from SQLAlchemy models")
-

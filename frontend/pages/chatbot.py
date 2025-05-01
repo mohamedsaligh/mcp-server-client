@@ -33,6 +33,7 @@ def fetch_chat_history(session_id):
         res = requests.get(f"{BACKEND_URL}/chat_history/{session_id}")
         if res.status_code == 200:
             chats = res.json()
+            print(">> chats:", chats)
             return [(chat["user_prompt"], chat["steps"], chat["final_answer"]) for chat in chats]
     except Exception:
         return []
@@ -41,6 +42,7 @@ def fetch_chat_history(session_id):
 def switch_session(sess_id):
     st.session_state.selected_session_id = sess_id
     st.session_state.chat_history = fetch_chat_history(sess_id)
+    print(">> switch_session - session_id:", st.session_state.selected_session_id)
     st.rerun()
 
 # --- Sidebar ---
@@ -60,10 +62,10 @@ with st.sidebar:
         st.session_state.chat_history = []
         st.rerun()
 
-    sessions = fetch_sessions()
-    for session in sessions:
+    for idx, session in enumerate(sessions):
         label = session["session_title"][:22] + "..." if len(session["session_title"]) > 25 else session["session_title"]
-        if st.button(label, key=session["session_id"], use_container_width=True):
+        unique_key = f"{session['session_id']}_{idx}"  # Ensure the key is unique
+        if st.button(label, key=unique_key, use_container_width=True):
             st.session_state.selected_session_id = session["session_id"]
             st.session_state.chat_history = fetch_chat_history(session["session_id"])
             st.rerun()
@@ -76,7 +78,7 @@ if not st.session_state.selected_session_id:
     st.info("Please start a new chat or select from history.")
     st.stop()
 
-prompt = st.chat_input("Type your request...")
+prompt = st.chat_input("Type your request...") # , accept_file=True)
 
 if prompt:
     progress_box = st.empty()
@@ -100,32 +102,18 @@ if prompt:
                     progress_box.info(event.data)
                 elif event.event == "error":
                     progress_box.error(event.data)
-                elif event.event == "steps":
-                    try:
-                        steps_collected = json.loads(event.data)
-                        progress_box.info("✅ Received steps.")
-                    except:
-                        progress_box.warning("⚠️ Failed to parse steps JSON.")
-                elif event.event == "requests":
-                    try:
-                        requests_collected = json.loads(event.data)
-                        progress_box.info("✅ Received requests.")
-                    except:
-                        progress_box.warning("⚠️ Failed to parse requests JSON.")
                 elif event.event == "result":
                     result_data = json.loads(event.data)
-                    final_answer = result_data.get("final", "")
-                    st.session_state.chat_history.append((prompt, steps_collected, final_answer))
-                    progress_box.success("✅ Complete.")
-                    break
-
+                    print("SSE Final Result:", result_data)
+                    steps_collected = result_data.get("steps", [])
+                    final_answer = result_data.get("final_answer", "")
         except Exception as e:
             st.error(f"Failed: {str(e)}")
 
     # Save the new chat step into history
-    # st.session_state.chat_history.append((prompt, steps_collected, final_answer))
+    st.session_state.chat_history.append((prompt, steps_collected, final_answer))
     st.rerun()
-    # progress_box.empty()
+
 
 # --- Display Chat History ---
 for idx, (prompt_text, steps, final_answer) in enumerate(st.session_state.chat_history):
@@ -135,17 +123,14 @@ for idx, (prompt_text, steps, final_answer) in enumerate(st.session_state.chat_h
             if steps:
                 st.markdown("**Assistant Response:**")
                 for step_idx, step in enumerate(steps, start=1):
-                    with st.expander(f"Step {step_idx} - Server: {step['server_name']}", expanded=False):
+                    with st.expander(f"Step {step_idx}: {step['server_name']}", expanded=False):
                         st.markdown("> **Request:**")
                         st.code(step['request'], language="json")
                         st.markdown("> **Response:**")
                         st.code(step['response'], language="json")
-
-                     # with st.expander(f"Step {step_idx} - Server: {step['server_name']}", expanded=False):
-                    #     st.markdown("> **Request:**")
-                    #     st.code(step['request'], language="json")
-                    #     st.markdown("> **Response:**")
-                    #     st.code(step['response'], language="json")
-
             if final_answer:
-                st.success(f"💬 **Final Answer:** {final_answer}")
+                if any(keyword in final_answer.lower() for keyword in ["error", "fail", "exception"]):
+                    st.error(f"❌ **Error:** {final_answer}")
+                else:
+                    st.success(f"💬 **Final Answer:** {final_answer}")
+

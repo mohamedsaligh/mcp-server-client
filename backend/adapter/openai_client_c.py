@@ -4,7 +4,7 @@ from backend.adapter.llm_client_base import LLMClient
 from typing import Dict, Any
 
 
-class OpenAIClientA(LLMClient):
+class OpenAIClientC(LLMClient):
     def __init__(self, api_key: str):
         self.api_key = api_key
 
@@ -15,8 +15,11 @@ class OpenAIClientA(LLMClient):
         ]
         client = OpenAI(api_key=self.api_key)
         response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages = messages,
+            model="text-davinci-003",
+            messages=[
+                {"role": "system", "content": "..."},
+                {"role": "user", "content": "..."}
+            ],
             temperature=0,
             max_tokens=800
         )

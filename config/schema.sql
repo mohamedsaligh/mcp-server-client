@@ -29,8 +29,7 @@ CREATE TABLE IF NOT EXISTS llm_apis (
 CREATE TABLE IF NOT EXISTS mcp_servers (
     id TEXT PRIMARY KEY,
     name TEXT,
-    category_id TEXT REFERENCES prompt_context(id),
-    manifest TEXT NOT NULL,
+    keywords TEXT,
     endpoint_url TEXT NOT NULL,
     is_active BOOLEAN DEFAULT 1
 );

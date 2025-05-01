@@ -16,7 +16,7 @@ def get_all_chat_history(db: Session):
     return db.query(ChatHistory).all()
 
 def get_chat_history_by_session(db: Session, session_id: str):
-    return db.query(ChatHistory).filter(ChatHistory.session_id == session_id).order_by(ChatHistory.created_at).first()
+    return db.query(ChatHistory).filter(ChatHistory.session_id == session_id).order_by(ChatHistory.created_at).all()
 
 def delete_chat_history(db: Session, session_id: str):
     record = get_chat_history(db, session_id)
