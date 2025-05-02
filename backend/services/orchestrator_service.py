@@ -48,20 +48,37 @@ class OrchestratorService:
         self.mcp_executor = BasicMCPExecutor()
         self.response_formatter = MarkdownResponseFormatter()
 
-    async def run_user_prompt(self, user_id: str, session_id: str, prompt_text: str) -> Dict[str, Any]:
+    
+    async def run_user_prompt(self, user_id: str, session_id: str, prompt_text: str):
         """
         Process a user prompt through the orchestration pipeline.
+        Returns an async generator that yields updates at various stages.
         """
         try:
+            # Initial status update
+            yield {"type": "status", "data": "Initializing LLM refiner"}
             llm_refiner = self._initialize_llm_refiner()
+            
+            yield {"type": "status", "data": "Gathering MCP server information"}
             mcp_info = await self._get_mcp_server_info()
             
+            yield {"type": "status", "data": "Processing prompt"}
             enriched_prompt = self._process_prompt(prompt_text, llm_refiner, mcp_info)
+            yield {"type": "status", "data": "Generating execution plan"}
             mcp_plan = self._parse_mcp_plan(enriched_prompt)
+            yield {"type": "plan", "data": mcp_plan}
             
-            steps = await self._execute_mcp_plan(mcp_plan, llm_refiner)
+            # Execute tasks with progress updates
+            steps = []
+            for i, task in enumerate(mcp_plan):
+                yield {"type": "task_start", "data": f"Executing task {i+1}/{len(mcp_plan)}: {task['server_name']}"}
+                step = await self._execute_single_task_with_context(task, steps, llm_refiner)
+                steps.append(step)
+                yield {"type": "task_complete", "data": step}
+
+            yield {"type": "status", "data": "Formatting final response"}
             formatted_response = self._format_final_response(steps, llm_refiner)
-            
+
             self._save_chat_history(
                 user_id=user_id,
                 session_id=session_id,
@@ -72,11 +89,12 @@ class OrchestratorService:
                 formatted_response=formatted_response
             )
 
-            return self._create_final_payload(session_id, steps, formatted_response)
-            
+            final_payload = self._create_final_payload(session_id, steps, formatted_response)
+            yield {"type": "result", "data": final_payload}
+
         except Exception as e:
             logger.error(f"Error in orchestration process: {str(e)}", exc_info=True)
-            raise OrchestratorServiceError(f"Orchestration failed: {str(e)}")
+            yield {"type": "error", "data": f"Orchestration failed: {str(e)}"}
 
     def _initialize_llm_refiner(self) -> OpenAILLMRefiner:
         """Initialize LLM refiner with API configuration."""
@@ -240,3 +258,28 @@ class OrchestratorService:
         }
         logger.debug(f"Final payload: {payload}")
         return payload
+    
+    async def _execute_single_task_with_context(self, task: Dict[str, Any], 
+                                             previous_steps: List[ExecutionStep],
+                                             llm_refiner: OpenAILLMRefiner) -> ExecutionStep:
+        """Execute a single task and return the execution step."""
+        payload = task["payload"].copy()
+        previous_results = [step.response for step in previous_steps]
+        
+        if task.get("refine_previous") and previous_results:
+            payload["previous_result"] = previous_results[-1]
+
+        endpoint = self._get_server_endpoint(task["server_name"])
+        result = await self.mcp_executor.execute(endpoint=endpoint, payload=payload)
+
+        if task.get("refine_llm"):
+            result = llm_refiner.post_process(
+                str(result),
+                {"system": task.get("refine_instruction", "")}
+            )
+        
+        return ExecutionStep(
+            server_name=task["server_name"],
+            request=task["payload"],
+            response=result
+        )

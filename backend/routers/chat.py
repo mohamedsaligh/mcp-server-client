@@ -28,19 +28,34 @@ async def stream_prompt(request: UserPromptRequest):
     async def event_generator():
         try:
             yield f"event:status\ndata:Starting orchestration, please wait...\n\n"
-            await asyncio.sleep(1)  # 🔥 Prevent early timeout
-
-            result = await orchestrator.run_user_prompt("user123", request.session_id, request.prompt)
-
-            # yield f"event:status\ndata:Completed orchestration\n\n"
-            # yield f"event:steps\ndata:{json.dumps(result['steps'])}\n\n"
-            # yield f"event:requests\ndata:{json.dumps(result['requests'])}\n\n"
-            yield f"event:result\ndata:{json.dumps(result)}\n\n"
-
+            await asyncio.sleep(0.5)  # Prevent early timeout
+            
+            # Process the orchestration steps and yield updates
+            async for update in orchestrator.run_user_prompt("user123", request.session_id, request.prompt):
+                update_type = update.get("type", "status")
+                update_data = update.get("data")
+                
+                if update_type == "error":
+                    yield f"event:error\ndata:{json.dumps({'message': update_data})}\n\n"
+                    return
+                elif update_type == "result":
+                    yield f"event:result\ndata:{json.dumps(update_data)}\n\n"
+                elif update_type == "plan":
+                    yield f"event:plan\ndata:{json.dumps(update_data)}\n\n"
+                elif update_type == "task_complete":
+                    yield f"event:step\ndata:{json.dumps(update_data.__dict__)}\n\n"
+                else:
+                    yield f"event:{update_type}\ndata:{json.dumps({'message': update_data})}\n\n"
+                
+                # Small delay to ensure browser receives events separately
+                await asyncio.sleep(0.05)
+                
         except asyncio.CancelledError:
             print("⚠️ SSE Stream was cancelled by client or timeout.")
             return
         except Exception as e:
-            yield f"event:error\ndata:{str(e)}\n\n"
+            error_msg = str(e)
+            print(f"⚠️ Error in stream processing: {error_msg}")
+            yield f"event:error\ndata:{json.dumps({'message': error_msg})}\n\n"
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
